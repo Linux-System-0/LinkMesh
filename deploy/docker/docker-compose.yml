@@ -1,0 +1,49 @@
+# LinkMesh 服务端一键部署
+#
+# 使用：
+#   cd deploy/docker
+#   docker compose up -d --build
+#
+# 首次启动会自动生成 server.json 与服务端密钥对，公钥打印在容器日志里：
+#   docker compose logs linkmesh-server
+#   docker compose exec linkmesh-server linkmesh-server --showpubkey
+#
+# 常用运维：
+#   docker compose exec linkmesh-server linkmesh-server --status
+#   docker compose exec linkmesh-server linkmesh-server --list
+#   docker compose exec linkmesh-server linkmesh-server --authorize "<公钥>" 10.13.13.2 "client-a"
+
+services:
+  linkmesh-server:
+    build:
+      context: ../..          # 仓库根目录（Cargo workspace）
+      dockerfile: deploy/docker/Dockerfile
+    image: linkmesh-server:latest
+    container_name: linkmesh-server
+    restart: unless-stopped
+
+    environment:
+      # 信令 + 中继监听端口（UDP）。改端口：直接改下面这行，或用 PORT=xxxx docker compose up -d
+      PORT: "${PORT:-8080}"
+      # 日志时区
+      TZ: Asia/Shanghai
+
+    ports:
+      # 信令 + 中继共用 UDP 端口（默认 8080，可用 PORT=xxxx 覆盖）
+      - "${PORT:-8080}:${PORT:-8080}/udp"
+      # 若在 server.json 里配置了独立中继端口 relay.port，请额外加一行，例如：
+      # - "18080:18080/udp"
+
+    volumes:
+      # server.json / server.pid / 日志 / mesh.json 等全部持久化到这里
+      - linkmesh-data:/data
+
+    healthcheck:
+      test: ["CMD", "linkmesh-server", "--config", "/data/server.json", "--status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  linkmesh-data:

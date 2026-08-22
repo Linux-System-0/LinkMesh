@@ -1,0 +1,31 @@
+# LinkMesh Docker 构建上下文排除项
+# 只把编译与部署真正需要的源码送进构建上下文，缩小体积、加快传输。
+
+# 版本控制与构建缓存
+.git
+.gitignore
+target
+**/target
+
+# 本地运行时数据（含私钥，严禁进入镜像）
+server.json
+client.json
+*.json
+server.pid
+client.pid
+*.log
+logs/
+
+# 测试产物 / 内部目录
+test-results/
+.transfer/
+.dsh/
+.opencode/
+.sdk-cache/
+
+# 非服务端相关模块（Android / 脚本辅助），本镜像只需 server
+android/
+scripts/
+.vscode/
+.idea/
+/web/
