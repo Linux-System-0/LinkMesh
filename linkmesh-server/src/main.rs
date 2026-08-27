@@ -46,6 +46,8 @@ struct Args {
     follow: bool,
     ip: Option<String>,
     reason: Option<String>,
+    /// -d：显示详细内容（面向开发者，所有的都要记录）。
+    detail: bool,
 }
 
 fn parse_args() -> Args {
@@ -56,6 +58,7 @@ fn parse_args() -> Args {
     let mut follow = false;
     let mut ip = None;
     let mut reason = None;
+    let mut detail = false;
 
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -77,6 +80,7 @@ fn parse_args() -> Args {
                     reason = Some(v);
                 }
             }
+            "-d" | "--detail" => detail = true,
             _ if arg.starts_with("--") && command.is_none() => {
                 command = Some(arg[2..].to_string());
             }
@@ -91,6 +95,7 @@ fn parse_args() -> Args {
         follow,
         ip,
         reason,
+        detail,
     }
 }
 
@@ -107,7 +112,7 @@ fn err(msg: &str) -> ! {
 }
 
 const CMD_LIST: &[(&str, &str)] = &[
-    ("start", "--start \"PORT\"：启动信令服务并监听指定端口，后台运行"),
+    ("start", "--start \"PORT\" [-d]：启动信令服务并监听指定端口（默认占用终端并输出日志到控制台，加 -d 则后台运行）"),
     ("stop", "--stop：停止信令服务"),
     ("genkey", "--genkey：生成服务端密钥对（已存在则报错），写入 server.json"),
     ("showpubkey", "--showpubkey：显示服务端公钥"),
@@ -464,20 +469,52 @@ fn run_command(args: &Args) {
                 "--config".to_string(),
                 args.config_path.to_string_lossy().to_string()];
             let run_refs: Vec<&str> = run_args.iter().map(|s| s.as_str()).collect();
-            if let Err(e) = daemon::spawn_daemon(
-                &run_refs,
-                Path::new(&cfg.log_file),
-                Path::new(&cfg.pid_file),
-                cfg.control_port,
-            ) {
-                err(&e);
+            // -d：显示详细内容（面向开发者，所有的都要记录）
+            // 默认占用终端并实时输出日志（--log -1 --follow）
+            if args.detail {
+                // 详细模式：后台运行，不占用终端
+                if let Err(e) = daemon::spawn_daemon(
+                    &run_refs,
+                    Path::new(&cfg.log_file),
+                    Path::new(&cfg.pid_file),
+                    cfg.control_port,
+                    args.detail,
+                ) {
+                    err(&e);
+                }
+                if !daemon::wait_ready(cfg.control_port, Duration::from_secs(5)) {
+                    err("守护进程启动超时，请查看日志");
+                }
+                info(&format!(
+                    "信令服务已启动，监听端口 {port}（中继默认同端口）"
+                ));
+            } else {
+                // 默认占用终端并实时输出日志：--log -1 --follow --run --config <path>
+                let run_args_with_log = [
+                    "--log".to_string(),
+                    "-1".to_string(),
+                    "--follow".to_string(),
+                    "--run".to_string(),
+                    "--config".to_string(),
+                    args.config_path.to_string_lossy().to_string(),
+                ];
+                let run_refs_with_log: Vec<&str> = run_args_with_log.iter().map(|s| s.as_str()).collect();
+                if let Err(e) = daemon::spawn_daemon(
+                    &run_refs_with_log,
+                    Path::new(&cfg.log_file),
+                    Path::new(&cfg.pid_file),
+                    cfg.control_port,
+                    args.detail,
+                ) {
+                    err(&e);
+                }
+                if !daemon::wait_ready(cfg.control_port, Duration::from_secs(5)) {
+                    err("守护进程启动超时，请查看日志");
+                }
+                info(&format!(
+                    "信令服务已启动，监听端口 {port}（中继默认同端口）"
+                ));
             }
-            if !daemon::wait_ready(cfg.control_port, Duration::from_secs(5)) {
-                err("守护进程启动超时，请查看日志");
-            }
-            info(&format!(
-                "信令服务已启动，监听端口 {port}（中继默认同端口）"
-            ));
         }
         "stop" => {
             let cfg = load_config(&args.config_path);

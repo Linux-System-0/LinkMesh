@@ -1,5 +1,5 @@
 // LinkMesh - 可以在多个操作系统上运行的内网穿透工具
-// Copyright (C) 2026 Linux-System-0(Github) / 一架在Linux上起飞的A320(Bilibili) <ls0_1@qq.com>
+// Copyright (C) 2026 Linux-System-0(Github) / 一架在 Linux 上起飞的 A320(Bilibili) <ls0_1@qq.com>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -43,16 +43,16 @@ pub fn ctrl_request(port: u16, token: Option<&str>, req: &Value) -> Result<Value
         .map_err(|e| format!("无法连接控制端口 {port}（守护进程未运行？）: {e}"))?;
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))
-        .map_err(|e| format!("设置超时失败: {e}"))?;
+        .map_err(|e| format!("设置超时失败：{e}"))?;
     let line = format!("{}\n", serde_json::to_string(&req).map_err(|e| e.to_string())?);
     stream
         .write_all(line.as_bytes())
-        .map_err(|e| format!("发送控制请求失败: {e}"))?;
+        .map_err(|e| format!("发送控制请求失败：{e}"))?;
     let mut buf = String::new();
     BufReader::new(&stream)
         .read_line(&mut buf)
-        .map_err(|e| format!("读取控制响应失败: {e}"))?;
-    let v: Value = serde_json::from_str(&buf).map_err(|e| format!("响应解析失败: {e}"))?;
+        .map_err(|e| format!("读取控制响应失败：{e}"))?;
+    let v: Value = serde_json::from_str(&buf).map_err(|e| format!("响应解析失败：{e}"))?;
     Ok(v)
 }
 
@@ -79,23 +79,33 @@ pub fn spawn_daemon(
     log_path: &Path,
     pid_path: &Path,
     control_port: u16,
+    detail: bool,
 ) -> Result<(), String> {
     if already_running(control_port) {
         return Err(format!("服务已在运行（控制端口 {control_port}）"));
     }
-    let exe = std::env::current_exe().map_err(|e| format!("获取自身路径失败: {e}"))?;
+    let exe = std::env::current_exe().map_err(|e| format!("获取自身路径失败：{e}"))?;
     let log = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
         .open(log_path)
-        .map_err(|e| format!("打开日志 {} 失败: {e}", log_path.display()))?;
-    let log_dup = log.try_clone().map_err(|e| format!("复制日志句柄失败: {e}"))?;
+        .map_err(|e| format!("打开日志 {} 失败：{e}", log_path.display()))?;
+    let log_dup = log.try_clone().map_err(|e| format!("复制日志句柄失败：{e}"))?;
 
     let mut cmd = Command::new(&exe);
     cmd.args(run_args);
-    cmd.stdin(Stdio::null());
-    cmd.stdout(log_dup);
-    cmd.stderr(log);
+    // -d 模式下不占用终端，输出写入日志文件
+    // 默认模式下占用终端并输出日志到控制台
+    if detail {
+        cmd.stdin(Stdio::null());
+        cmd.stdout(log_dup);
+        cmd.stderr(log);
+    } else {
+        // 占用终端：输出到控制台，同时追加写入日志文件
+        cmd.stdin(Stdio::inherit());
+        cmd.stdout(Stdio::inherit());
+        cmd.stderr(Stdio::inherit());
+    }
 
     #[cfg(unix)]
     {
@@ -108,9 +118,9 @@ pub fn spawn_daemon(
         }
     }
 
-    let child = cmd.spawn().map_err(|e| format!("启动守护进程失败: {e}"))?;
+    let child = cmd.spawn().map_err(|e| format!("启动守护进程失败：{e}"))?;
     std::fs::write(pid_path, child.id().to_string())
-        .map_err(|e| format!("写入 PID 文件失败: {e}"))?;
+        .map_err(|e| format!("写入 PID 文件失败：{e}"))?;
     Ok(())
 }
 

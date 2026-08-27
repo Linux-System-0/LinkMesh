@@ -51,8 +51,8 @@ struct Args {
     code: Option<String>,
     /// 房间令牌（--connect / --join 携带，写入 client.json 的 servers[].token）。
     token: Option<String>,
-    /// --hidden：后台运行，不占用终端，不输出日志到控制台（日志仅写入文件）。
-    hidden: bool,
+    /// -d：显示详细内容（面向开发者，所有的都要记录）。
+    detail: bool,
 }
 
 fn parse_args() -> Args {
@@ -65,7 +65,7 @@ fn parse_args() -> Args {
     let mut trust = None;
     let mut code = None;
     let mut token = None;
-    let mut hidden = false;
+    let mut detail = false;
 
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -92,7 +92,7 @@ fn parse_args() -> Args {
                     token = Some(v);
                 }
             }
-            "--hidden" => hidden = true,
+            "-d" | "--detail" => detail = true,
             "-y" | "--yes" => {
                 if trust == Some(false) {
                     err("不能同时指定 -y 与 -n");
@@ -121,7 +121,7 @@ fn parse_args() -> Args {
         trust,
         code,
         token,
-        hidden,
+        detail,
     }
 }
 
@@ -145,7 +145,7 @@ const CMD_LIST: &[(&str, &str)] = &[
     ("newvmnic", "--newvmnic \"name\" [--ip x.x.x.x]：新建虚拟网卡（虚拟 IP 由服务端证书绑定，--ip 仅作占位）"),
     ("delvmnic", "--delvmnic \"name\"：删除虚拟网卡（自动断开其上的连接）"),
     ("newserver", "--newserver IP(:Port) \"name\"：新增/修改服务器；name 为空则删除"),
-    ("connect", "--connect \"server\" \"vmnic\" [--token 房间令牌] [--hidden]：连接服务器（默认占用终端并输出日志到控制台，加 --hidden 则后台运行）"),
+    ("connect", "--connect \"server\" \"vmnic\" [--token 房间令牌] [-d]：连接服务器（默认占用终端并输出日志到控制台，加 -d 则后台运行）"),
     ("disconnect", "--disconnect \"server\"：断开与指定服务器的连接"),
     ("stop", "--stop：停止客户端守护进程并清理 connections[]"),
     ("alias", "--alias \"名称\" \"虚拟IP\"：新增/更新本地别名（如 computer -> 10.13.13.5）；IP 与本机虚拟 IP 一致时会被自报给服务器"),
@@ -530,18 +530,19 @@ fn run_command(args: &Args) {
                 }
             }
 
-            // --hidden：后台运行，不占用终端
+            // -d：显示详细内容（面向开发者，所有的都要记录）
             // 默认占用终端并实时输出日志（--log -1 --follow）
             let run_args: Vec<String>;
-            if args.hidden {
-                // 后台运行：--run --config <path>
+            if args.detail {
+                // 详细模式：后台运行，不占用终端
+                // -d 参数下不占用终端，日志仅写入文件
                 run_args = vec![
                     "--run".to_string(),
                     "--config".to_string(),
                     args.config_path.to_string_lossy().to_string(),
                 ];
             } else {
-                // 占用终端并实时输出日志：--log -1 --follow --run --config <path>
+                // 默认占用终端并实时输出日志：--log -1 --follow --run --config <path>
                 run_args = vec![
                     "--log".to_string(),
                     "-1".to_string(),
@@ -557,7 +558,7 @@ fn run_command(args: &Args) {
                 Path::new(&cfg.log_file),
                 Path::new(&cfg.pid_file),
                 cfg.control_port,
-                args.hidden,
+                args.detail,
             ) {
                 err(&e);
             }

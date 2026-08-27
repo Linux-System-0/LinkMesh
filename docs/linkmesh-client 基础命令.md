@@ -45,10 +45,10 @@ linkmesh-client 是 NAT 穿透客户端。每台设备在本地生成自己的�
     二：linkmesh-client --newserver 1.2.3.4:1234 "my-server"
     三：linkmesh-client --newserver 1.2.3.4 ""
 
-## --connect "server's name" "vmnic" [--token 房间令牌] [--hidden]
+## --connect "server's name" "vmnic" [--token 房间令牌] [-d]
 ### 说明
     连接服务器并建立隧道。
-    默认占用终端并实时输出日志到控制台（方便调试）；加 `--hidden` 则后台运行，不占用终端，日志仅写入文件。
+    默认占用终端并实时输出日志到控制台（方便调试）；加 `-d` 则后台运行，不占用终端，日志仅写入文件。
     先尝试 UDP 打洞与对端直连；打洞失败（超时/错误次数超限）自动降级为中继；
     `hole_punch.enabled=false` 时直接全程走中继（不再尝试直连）。
     中继默认使用服务器本身，可在 client.json 的 relay 段修改。
@@ -67,7 +67,7 @@ linkmesh-client 是 NAT 穿透客户端。每台设备在本地生成自己的�
     二：linkmesh-client --connect "my-server" "linkmesh0" -y   # CI 中自动信任首次公钥
     三：linkmesh-client --connect "my-server" "linkmesh0" --token my-room-token
     四：linkmesh-client --connect "my-server" "linkmesh0" -n   # CI 中拒绝信任并退出
-    五：linkmesh-client --connect "my-server" "linkmesh0" --hidden  # 后台运行，不占用终端
+    五：linkmesh-client --connect "my-server" "linkmesh0" -d   # 后台运行，不占用终端
 
 ## --join "server's name" "vmnic" --code LMJ-... [--token 房间令牌] [-y|-n]
 ### 说明
