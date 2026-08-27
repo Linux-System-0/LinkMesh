@@ -79,6 +79,7 @@ pub fn spawn_daemon(
     log_path: &Path,
     pid_path: &Path,
     control_port: u16,
+    hidden: bool,
 ) -> Result<(), String> {
     if already_running(control_port) {
         return Err(format!("守护进程已在运行（控制端口 {control_port}）"));
@@ -93,9 +94,18 @@ pub fn spawn_daemon(
 
     let mut cmd = Command::new(&exe);
     cmd.args(run_args);
-    cmd.stdin(Stdio::null());
-    cmd.stdout(log_dup);
-    cmd.stderr(log);
+    // --hidden 模式下不占用终端，输出写入日志文件
+    // 默认模式下占用终端并输出日志到控制台
+    if hidden {
+        cmd.stdin(Stdio::null());
+        cmd.stdout(log_dup);
+        cmd.stderr(log);
+    } else {
+        // 占用终端：输出到控制台，同时追加写入日志文件
+        cmd.stdin(Stdio::inherit());
+        cmd.stdout(Stdio::inherit());
+        cmd.stderr(Stdio::inherit());
+    }
 
     #[cfg(unix)]
     {
